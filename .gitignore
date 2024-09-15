@@ -12,3 +12,5 @@ secrets.toml
 venv/
 tmp/
 data/
+.venv/
+__pycache__/**
