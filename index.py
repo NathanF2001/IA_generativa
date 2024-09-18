@@ -5,6 +5,7 @@ import pandas as pd
 from EggModelGen import EggModelGen
 from LoadImage import LoadImage
 from io import StringIO
+import random
 
 
 def load_key():
@@ -65,17 +66,17 @@ def generate_training_example( df: pd.DataFrame, start, end):
 
     csv_result = to_text_csv(df,start, end)
 
-    csv_result += "(EXAMPLE)\n" + csv_result
+    csv_string  = "(EXAMPLE)\n" + csv_result
 
-    return csv_result
+    return csv_string
 
 def to_text_csv(df: pd.DataFrame, start, end):
     """Função que pega o gabarito existente e faz um recorte de acordo com um range"""
 
     output = "number;classification\n"
 
-    classification_image = df.loc[start:end,['OVOSCOPIA']].copy()
-    classification_image['number'] = range(1,16)
+    classification_image = df.loc[start:end-1,['OVOSCOPIA']].copy()
+    classification_image['number'] = range(1,end-start+1)
 
     for row in classification_image.iterrows():
         output += f"{row[1].number};{row[1].OVOSCOPIA}\n"
@@ -98,8 +99,15 @@ def load_all_egg_images_to_gemini(path_images):
 
     i = 0
 
-    for path in path_images:
-        start, end = (i*15)+1, (i+1)*15
+    for p,path in enumerate(path_images):
+        start = i 
+
+        if p%14 == 13:
+            i += 5
+        else:
+            i += 15
+
+        end = i
 
         file_gemini = load_image_to_gemini(path)
         map_file_reference[path] = [(start, end), file_gemini]
@@ -112,7 +120,7 @@ def main():
     load_key()
 
     df = pd.read_excel("./IAGenOvoscopia/OVOSCOPIA-1RODADA - Sem 28dias.xlsx")
-    folders = ["0 DIAS - FRESCOS", "14 DIAS", "21 DIAS", "7 DIAS"]
+    folders = ["0 DIAS - FRESCOS",  "7 DIAS", "14 DIAS", "21 DIAS",]
     
     # Pegar todos os paths das imagens
     images_eggs_path = load_folders(os.getcwd(), folders)
@@ -137,17 +145,26 @@ def main():
     egg_ia_gen.create_model(initial_instruction=instruction)
 
     #Carregar o primeira imagem como exemplo
-    example = map_file_reference[images_eggs_path[0]]
+    examples = []
+    all_files_path = list(filter(lambda item: not item.endswith('IMG_0080-14.jpg') and 
+                                    not item.endswith('IMG_8945-img14.JPG') and
+                                    not item.endswith('IMG_9616.jpeg') and 
+                                    not item.endswith('IMG_9806-14.jpeg'),images_eggs_path[:]))
+    
+    for path in random.sample(all_files_path,6):
+        example = map_file_reference[path]
 
+        csv_example = generate_training_example(df, example[0][0], example[0][1])
+
+        examples.append(example[1])
+        examples.append(csv_example)
     chat_session = egg_ia_gen.model.start_chat(
         history=[
             {
                 "role": "user",
                 "parts": [
-                   first_image_reference,
-                   example[1],
-                   generate_training_example(df, example[0][0] - 1, example[0][1] - 1)
-                ],
+                   first_image_reference,   
+                ] + examples,
             },
         ]
     )
