@@ -35,6 +35,7 @@ class Matrix2x2Model(DefaultConfig):
         with open(os.path.join(os.getcwd(), "models", "prompts", "matrix_2x2.txt"), 'r', encoding='utf-8') as file:
             linhas = "".join(file.readlines())
         return linhas
+    
 
 
 
